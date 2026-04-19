@@ -33,6 +33,7 @@ export type BuildingSystem = {
     strength: number,
   ) => void;
   collapseBuilding: (building: BuildingData) => void;
+  blastBuildingsFromPoint: (origin: THREE.Vector3, radius: number, strength: number) => void;
 };
 
 const buildingPalettes = [
@@ -93,6 +94,8 @@ export function createBuildingSystem(ctx: PhysicsContext): BuildingSystem {
     impulseDir: THREE.Vector3,
     instantToGround: boolean,
     strength: number,
+    blastOrigin?: THREE.Vector3,
+    blastRadius = 0,
   ) => {
     if (building.isCollapsed && building.chunks.every((chunk) => chunk.detached)) return;
 
@@ -144,6 +147,48 @@ export function createBuildingSystem(ctx: PhysicsContext): BuildingSystem {
       }
 
       const layerRatio = THREE.MathUtils.clamp(chunk.localOffset.y / Math.max(1, building.height), 0, 1);
+
+      if (blastOrigin) {
+        const chunkWorldPos = new THREE.Vector3(
+          building.baseX + chunk.localOffset.x,
+          chunk.localOffset.y,
+          building.baseZ + chunk.localOffset.z,
+        );
+        const blastDir = chunkWorldPos.clone().sub(blastOrigin);
+        blastDir.y = Math.max(0.22 + layerRatio * 0.65, blastDir.y * 0.22);
+        if (blastDir.lengthSq() < 1e-4) {
+          blastDir.set(
+            seededRand(seed + idx * 23 + 15) - 0.5,
+            0.8,
+            seededRand(seed + idx * 23 + 16) - 0.5,
+          );
+        }
+
+        const radialDistance = Math.hypot(chunkWorldPos.x - blastOrigin.x, chunkWorldPos.z - blastOrigin.z);
+        const falloff = THREE.MathUtils.clamp(1 - radialDistance / Math.max(1, blastRadius), 0.18, 1);
+        blastDir.normalize();
+
+        const tangential = new THREE.Vector3(-blastDir.z, 0, blastDir.x).multiplyScalar(
+          (seededRand(seed + idx * 19 + 17) - 0.5) * (2.2 + strength * 1.6) * falloff,
+        );
+        const liftImpulse =
+          4.4 + strength * 3.6 + layerRatio * 4.4 + seededRand(seed + idx * 19 + 18) * (1.8 + strength * 0.6);
+        const blastImpulse = 8.5 + strength * 15 + layerRatio * 6 + falloff * 12;
+        const impulse = blastDir.multiplyScalar(blastImpulse).add(tangential);
+        impulse.y += liftImpulse;
+
+        chunk.body.applyImpulse({ x: impulse.x, y: impulse.y, z: impulse.z }, true);
+        chunk.body.setAngvel(
+          {
+            x: (seededRand(seed + idx * 17 + 19) - 0.5) * (5.4 + strength * 1.2),
+            y: (seededRand(seed + idx * 17 + 20) - 0.5) * (5.2 + strength * 1.2),
+            z: (seededRand(seed + idx * 17 + 21) - 0.5) * (5.4 + strength * 1.4),
+          },
+          true,
+        );
+        return;
+      }
+
       const lateralBias = THREE.MathUtils.clamp(
         (towardRoad * chunk.localOffset.x) / Math.max(0.8, building.width * 0.5) * 0.5 + 0.5,
         0,
@@ -394,6 +439,26 @@ export function createBuildingSystem(ctx: PhysicsContext): BuildingSystem {
     detachChunks(building, impulseDir, instantToGround, strength);
   };
 
+  const blastBuildingsFromPoint = (origin: THREE.Vector3, radius: number, strength: number) => {
+    forEachBuilding((building) => {
+      if (building.isCollapsed) return;
+
+      const dx = building.baseX - origin.x;
+      const dz = building.baseZ - origin.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance > radius) return;
+
+      const away = new THREE.Vector3(dx, 0, dz);
+      if (away.lengthSq() < 1e-4) {
+        away.set(Math.random() - 0.5, 0, Math.random() - 0.5);
+      }
+      away.normalize();
+
+      const falloff = THREE.MathUtils.clamp(1 - distance / Math.max(radius, 1), 0.2, 1);
+      detachChunks(building, away, false, strength * (0.9 + falloff * 0.8), origin, radius);
+    });
+  };
+
   return {
     buildingBaseColliderHandles,
     createBuildingsForChunk,
@@ -406,5 +471,6 @@ export function createBuildingSystem(ctx: PhysicsContext): BuildingSystem {
     syncVisualsFromPhysics,
     detachTopChunks,
     collapseBuilding,
+    blastBuildingsFromPoint,
   };
 }

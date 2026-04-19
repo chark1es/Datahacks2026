@@ -56,6 +56,7 @@ export default function BlockOnLand() {
   const [progressUi, setProgressUi] = useState<ProgressUi | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
+  const [endingPhase, setEndingPhase] = useState<"idle" | "cinematic" | "impact" | "message">("idle");
   const [restartToken, setRestartToken] = useState(0);
   const gameCompletedRef = useRef(false);
   gameCompletedRef.current = gameCompleted;
@@ -157,6 +158,182 @@ export default function BlockOnLand() {
       const orbitRight = new THREE.Vector3();
       const orbitOffset = new THREE.Vector3();
       const worldUp3 = new THREE.Vector3(0, 1, 0);
+      const endLookTarget = new THREE.Vector3();
+      const meteorTarget = new THREE.Vector3();
+      const impactTarget = new THREE.Vector3();
+      const impactOffset = new THREE.Vector3();
+      const endCamFrom = new THREE.Vector3();
+      const endCamTo = new THREE.Vector3();
+      const endLookFrom = new THREE.Vector3();
+      const endLookTo = new THREE.Vector3();
+      const explosionGroup = new THREE.Group();
+      const explosionShellScale = new THREE.Vector3(1, 1, 1);
+      const explosionRingScale = new THREE.Vector3(1, 1, 1);
+      const meteorCore = new THREE.Group();
+      const meteorDisposables: Array<THREE.BufferGeometry | THREE.Material> = [];
+      const registerMeteorMesh = (mesh: THREE.Mesh) => {
+        meteorDisposables.push(mesh.geometry as THREE.BufferGeometry);
+        if (Array.isArray(mesh.material)) {
+          mesh.material.forEach((material) => meteorDisposables.push(material));
+        } else {
+          meteorDisposables.push(mesh.material);
+        }
+        meteorCore.add(mesh);
+        return mesh;
+      };
+
+      const meteorShellMaterial = new THREE.MeshStandardMaterial({
+        color: 0x5a4636,
+        emissive: 0x30150b,
+        emissiveIntensity: 0.55,
+        roughness: 1,
+        metalness: 0.04,
+      });
+      const meteorShell = registerMeteorMesh(
+        new THREE.Mesh(new THREE.DodecahedronGeometry(2.55, 0), meteorShellMaterial),
+      );
+      meteorShell.castShadow = true;
+      meteorShell.scale.set(1.18, 0.9, 0.8);
+
+      const meteorCrustMaterial = new THREE.MeshStandardMaterial({
+        color: 0x261912,
+        emissive: 0x140804,
+        emissiveIntensity: 0.45,
+        roughness: 0.98,
+        metalness: 0.02,
+      });
+      const meteorCrust = registerMeteorMesh(
+        new THREE.Mesh(new THREE.IcosahedronGeometry(2.02, 1), meteorCrustMaterial),
+      );
+      meteorCrust.castShadow = true;
+      meteorCrust.scale.set(1.04, 0.8, 0.72);
+      meteorCrust.rotation.set(0.5, 0.2, -0.35);
+
+      const meteorEmberMaterial = new THREE.MeshStandardMaterial({
+        color: 0xff9c52,
+        emissive: 0xff6724,
+        emissiveIntensity: 1.9,
+        roughness: 0.58,
+        metalness: 0.03,
+        transparent: true,
+        opacity: 0.92,
+      });
+      const meteorEmberShell = registerMeteorMesh(
+        new THREE.Mesh(new THREE.IcosahedronGeometry(1.9, 1), meteorEmberMaterial),
+      );
+      meteorEmberShell.scale.set(0.96, 0.74, 0.66);
+      meteorEmberShell.rotation.set(0.2, -0.35, 0.15);
+
+      const meteorWakeOuterMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffb869,
+        emissive: 0xff7d2d,
+        emissiveIntensity: 2.1,
+        roughness: 0.84,
+        metalness: 0.01,
+        transparent: true,
+        opacity: 0.68,
+      });
+      const meteorWakeOuter = registerMeteorMesh(
+        new THREE.Mesh(new THREE.SphereGeometry(1.42, 22, 18), meteorWakeOuterMaterial),
+      );
+      meteorWakeOuter.position.set(0, 0.2, -3.8);
+      meteorWakeOuter.scale.set(1.35, 1.1, 3.6);
+
+      const meteorWakeInnerMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffe2a2,
+        emissive: 0xffbc58,
+        emissiveIntensity: 2.4,
+        roughness: 0.34,
+        metalness: 0.01,
+        transparent: true,
+        opacity: 0.8,
+      });
+      const meteorWakeInner = registerMeteorMesh(
+        new THREE.Mesh(new THREE.SphereGeometry(0.9, 18, 16), meteorWakeInnerMaterial),
+      );
+      meteorWakeInner.position.set(0, 0.1, -3.15);
+      meteorWakeInner.scale.set(0.9, 0.85, 2.85);
+
+      const meteorSmokeMaterial = new THREE.MeshStandardMaterial({
+        color: 0x3d281d,
+        emissive: 0x2d1006,
+        emissiveIntensity: 0.32,
+        roughness: 1,
+        metalness: 0,
+        transparent: true,
+        opacity: 0.3,
+      });
+      const meteorSmoke = registerMeteorMesh(
+        new THREE.Mesh(new THREE.SphereGeometry(1.8, 18, 14), meteorSmokeMaterial),
+      );
+      meteorSmoke.position.set(0, 0.45, -5.6);
+      meteorSmoke.scale.set(1.7, 1.2, 2.9);
+
+      const meteorFragments: THREE.Mesh[] = [];
+      for (let i = 0; i < 5; i += 1) {
+        const fragment = registerMeteorMesh(
+          new THREE.Mesh(
+            new THREE.DodecahedronGeometry(0.35 + i * 0.07, 0),
+            i % 2 === 0 ? meteorShellMaterial : meteorCrustMaterial,
+          ),
+        );
+        const yaw = (i / 5) * Math.PI * 2 + 0.35;
+        const radius = 1.3 + (i % 2) * 0.45;
+        fragment.position.set(Math.cos(yaw) * radius, (i - 2) * 0.22, Math.sin(yaw) * 0.55);
+        fragment.scale.set(1.2, 0.85, 0.95);
+        fragment.castShadow = true;
+        meteorFragments.push(fragment);
+      }
+
+      meteorCore.visible = false;
+      scene.add(meteorCore);
+
+      const impactFlash = new THREE.PointLight(0xff8c52, 0, 70, 2);
+      impactFlash.visible = false;
+      scene.add(impactFlash);
+
+      const explosionShell = new THREE.Mesh(
+        new THREE.SphereGeometry(2.8, 24, 24),
+        new THREE.MeshStandardMaterial({
+          color: 0xffb86b,
+          emissive: 0xff6b2f,
+          emissiveIntensity: 1.6,
+          roughness: 0.45,
+          metalness: 0.02,
+          transparent: true,
+          opacity: 0,
+        }),
+      );
+      const explosionCore = new THREE.Mesh(
+        new THREE.SphereGeometry(1.5, 20, 20),
+        new THREE.MeshStandardMaterial({
+          color: 0xfff1be,
+          emissive: 0xffd37a,
+          emissiveIntensity: 2.1,
+          roughness: 0.2,
+          metalness: 0.01,
+          transparent: true,
+          opacity: 0,
+        }),
+      );
+      const explosionRing = new THREE.Mesh(
+        new THREE.TorusGeometry(3.6, 0.42, 18, 48),
+        new THREE.MeshStandardMaterial({
+          color: 0xff9a52,
+          emissive: 0xff6129,
+          emissiveIntensity: 1.5,
+          roughness: 0.58,
+          metalness: 0.04,
+          transparent: true,
+          opacity: 0,
+        }),
+      );
+      explosionRing.rotation.x = Math.PI / 2;
+      explosionGroup.visible = false;
+      explosionGroup.add(explosionShell);
+      explosionGroup.add(explosionCore);
+      explosionGroup.add(explosionRing);
+      scene.add(explosionGroup);
 
       let mouseOrbitActive = false;
       let mouseOrbitPointerId = -1;
@@ -166,8 +343,10 @@ export default function BlockOnLand() {
       let mouseOrbitPitch = 0;
       let mouseOrbitYawTarget = 0;
       let mouseOrbitPitchTarget = 0;
+      const endingShortcutKeys = { o: false, p: false };
 
       const onPointerDown = (event: PointerEvent) => {
+        if (gameCompletedRef.current) return;
         if (event.button !== 0 && event.button !== 2) return;
         mouseOrbitActive = true;
         mouseOrbitPointerId = event.pointerId;
@@ -178,6 +357,7 @@ export default function BlockOnLand() {
       };
 
       const onPointerMove = (event: PointerEvent) => {
+        if (gameCompletedRef.current) return;
         if (!mouseOrbitActive || event.pointerId !== mouseOrbitPointerId) return;
         const dx = event.clientX - mouseLastX;
         const dy = event.clientY - mouseLastY;
@@ -212,11 +392,38 @@ export default function BlockOnLand() {
         event.preventDefault();
       };
 
+      const onEndingShortcutKey = (event: KeyboardEvent, down: boolean) => {
+        if (event.repeat) return;
+
+        if (event.code === "KeyO") {
+          endingShortcutKeys.o = down;
+        } else if (event.code === "KeyP") {
+          endingShortcutKeys.p = down;
+        } else {
+          return;
+        }
+
+        if (down && gameStarted && !gameCompletedRef.current && endingShortcutKeys.o && endingShortcutKeys.p) {
+          event.preventDefault();
+          startEndingSequence();
+          return;
+        }
+
+        if (down) {
+          event.preventDefault();
+        }
+      };
+
+      const onEndingShortcutKeyDown = (event: KeyboardEvent) => onEndingShortcutKey(event, true);
+      const onEndingShortcutKeyUp = (event: KeyboardEvent) => onEndingShortcutKey(event, false);
+
       renderer.domElement.addEventListener("pointerdown", onPointerDown);
       renderer.domElement.addEventListener("pointermove", onPointerMove);
       window.addEventListener("pointerup", onPointerUp);
       window.addEventListener("pointercancel", onPointerUp);
       renderer.domElement.addEventListener("contextmenu", onCanvasContextMenu);
+      window.addEventListener("keydown", onEndingShortcutKeyDown);
+      window.addEventListener("keyup", onEndingShortcutKeyUp);
 
       let pgvData: Float32Array | null = null;
       let pgvManifest: PgvManifest | null = null;
@@ -252,6 +459,31 @@ export default function BlockOnLand() {
       let progressCache: ProgressUi | null = null;
       let simTime = 0;
       let physicsAccumulator = 0;
+      let endingSequenceStarted = false;
+      let endingElapsed = 0;
+      let impactTriggered = false;
+      let impactBlastTriggered = false;
+      let endingPhaseState: "idle" | "cinematic" | "impact" | "message" = "idle";
+
+      const updateEndingPhase = (phase: "idle" | "cinematic" | "impact" | "message") => {
+        if (endingPhaseState === phase) return;
+        endingPhaseState = phase;
+        setEndingPhase(phase);
+      };
+
+      const startEndingSequence = () => {
+        if (endingSequenceStarted) return;
+        endingSequenceStarted = true;
+        endingElapsed = 0;
+        impactTriggered = false;
+        impactBlastTriggered = false;
+        gameCompletedRef.current = true;
+        car.setControlsEnabled(false);
+        mouseOrbitActive = false;
+        mouseOrbitPointerId = -1;
+        updateEndingPhase("cinematic");
+        setGameCompleted(true);
+      };
 
       const sampleScenarioPgvAtCar = (scenarioIndex: number): number => {
         if (!pgvData || pgvCount <= 0 || scenarioIndex < 0 || scenarioIndex >= pgvCount || !pgvManifest) {
@@ -336,7 +568,7 @@ export default function BlockOnLand() {
         );
 
         if (!gameCompletedRef.current && monthTimeline.length > 0 && timelineProgress.progress01 >= 1) {
-          setGameCompleted(true);
+          startEndingSequence();
         }
 
         const lightPhase = 0.5 + 0.5 * Math.sin(forwardDistance / 95);
@@ -445,7 +677,7 @@ export default function BlockOnLand() {
           carForward.normalize();
         }
 
-        if (!mouseOrbitActive) {
+        if (!gameCompletedRef.current && !mouseOrbitActive) {
           mouseOrbitYawTarget = THREE.MathUtils.lerp(
             mouseOrbitYawTarget,
             0,
@@ -458,52 +690,144 @@ export default function BlockOnLand() {
           );
         }
 
-        mouseOrbitYaw = THREE.MathUtils.lerp(
-          mouseOrbitYaw,
-          mouseOrbitYawTarget,
-          Math.min(1, dt * CAMERA_MOUSE_FOLLOW_SPEED),
-        );
-        mouseOrbitPitch = THREE.MathUtils.lerp(
-          mouseOrbitPitch,
-          mouseOrbitPitchTarget,
-          Math.min(1, dt * CAMERA_MOUSE_FOLLOW_SPEED),
-        );
+        if (gameCompletedRef.current && endingSequenceStarted) {
+          endingElapsed += dt;
 
-        orbitForward.copy(carForward).applyAxisAngle(worldUp3, mouseOrbitYaw);
-        if (orbitForward.lengthSq() < 1e-6) {
-          orbitForward.set(0, 0, -1);
+          const cinematicProgress = THREE.MathUtils.clamp(endingElapsed / 2.2, 0, 1);
+          const easedCinematic = 1 - Math.pow(1 - cinematicProgress, 3);
+          impactTarget.copy(car.group.position);
+          impactTarget.y = 0.3;
+
+          endCamFrom.copy(car.group.position).add(new THREE.Vector3(-10, 9.5, 24));
+          endCamTo.copy(car.group.position).add(new THREE.Vector3(18, 14, 26));
+          desiredCamPos.copy(endCamFrom).lerp(endCamTo, easedCinematic);
+          camera.position.lerp(desiredCamPos, 0.08);
+
+          endLookFrom.copy(car.group.position).add(new THREE.Vector3(0, 2.2, -13));
+          endLookTo.copy(impactTarget).add(new THREE.Vector3(0.5, 3.6, -1.5));
+          endLookTarget.copy(endLookFrom).lerp(endLookTo, easedCinematic);
+          camera.lookAt(endLookTarget);
+          camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, -0.08, 0.08);
+
+          meteorCore.visible = true;
+          meteorCore.rotation.x += dt * 2.4;
+          meteorCore.rotation.y += dt * 1.7;
+          meteorTarget.copy(impactTarget);
+          impactOffset.set(-36, 30, -22).multiplyScalar(1 - Math.min(endingElapsed / 2.35, 1));
+          meteorCore.position.copy(meteorTarget).add(impactOffset);
+          meteorCore.lookAt(impactTarget);
+          const meteorPulse = 0.92 + Math.sin(endingElapsed * 24) * 0.08;
+          meteorEmberMaterial.emissiveIntensity = 1.7 + meteorPulse * 0.7;
+          meteorWakeOuterMaterial.emissiveIntensity = 1.8 + meteorPulse * 0.9;
+          meteorWakeInnerMaterial.emissiveIntensity = 2 + meteorPulse * 1.1;
+          meteorWakeOuter.scale.set(1.35 + meteorPulse * 0.12, 1.08 + meteorPulse * 0.08, 3.4 + meteorPulse * 0.75);
+          meteorWakeInner.scale.set(0.88 + meteorPulse * 0.08, 0.8 + meteorPulse * 0.08, 2.7 + meteorPulse * 0.55);
+          meteorSmoke.scale.set(1.6 + meteorPulse * 0.2, 1.15 + meteorPulse * 0.1, 2.8 + meteorPulse * 0.45);
+          meteorFragments.forEach((fragment, idx) => {
+            fragment.rotation.x += dt * (0.8 + idx * 0.1);
+            fragment.rotation.y -= dt * (1.2 + idx * 0.12);
+          });
+
+          if (!impactTriggered && endingElapsed >= 2.15) {
+            impactTriggered = true;
+            updateEndingPhase("impact");
+          }
+
+          if (impactTriggered) {
+            if (!impactBlastTriggered) {
+              impactBlastTriggered = true;
+              buildingSystem.blastBuildingsFromPoint(impactTarget, 42, 2.4);
+            }
+            meteorCore.visible = false;
+            impactFlash.visible = true;
+            impactFlash.position.copy(impactTarget).add(new THREE.Vector3(0, 3.5, 0));
+            const flashT = endingElapsed - 2.15;
+            impactFlash.intensity = Math.max(0, 11 - flashT * 12);
+            tempColor.copy(backgroundColor).lerp(new THREE.Color(0x090909), THREE.MathUtils.clamp(flashT / 1.1, 0, 1));
+            backgroundColor.copy(tempColor);
+            (scene.fog as THREE.Fog).color.lerp(new THREE.Color(0x090909), Math.min(1, dt * 2.4));
+            ambient.intensity = THREE.MathUtils.lerp(ambient.intensity, 0.08, Math.min(1, dt * 2.2));
+            skyLight.intensity = THREE.MathUtils.lerp(skyLight.intensity, 0.06, Math.min(1, dt * 2.2));
+            sun.intensity = THREE.MathUtils.lerp(sun.intensity, 0.12, Math.min(1, dt * 2.2));
+
+            explosionGroup.visible = flashT <= 1.2;
+            explosionGroup.position.copy(impactTarget).add(new THREE.Vector3(0, 1.1, 0));
+            const shellMaterial = explosionShell.material as THREE.MeshStandardMaterial;
+            const coreMaterial = explosionCore.material as THREE.MeshStandardMaterial;
+            const ringMaterial = explosionRing.material as THREE.MeshStandardMaterial;
+            const shellScale = 1 + flashT * 7.2;
+            const coreScale = 1 + flashT * 4.8;
+            const ringScale = 1 + flashT * 5.9;
+
+            explosionShellScale.setScalar(shellScale);
+            explosionRingScale.set(ringScale, ringScale, Math.max(0.35, 1 - flashT * 0.42));
+            explosionShell.scale.copy(explosionShellScale);
+            explosionCore.scale.setScalar(coreScale);
+            explosionRing.scale.copy(explosionRingScale);
+            explosionRing.rotation.z += dt * 1.8;
+
+            shellMaterial.opacity = Math.max(0, 0.82 - flashT * 0.72);
+            coreMaterial.opacity = Math.max(0, 0.96 - flashT * 1.05);
+            ringMaterial.opacity = Math.max(0, 0.74 - flashT * 0.62);
+          } else {
+            impactFlash.visible = false;
+            explosionGroup.visible = false;
+          }
+
+          if (endingElapsed >= 3.3) {
+            updateEndingPhase("message");
+          }
         } else {
-          orbitForward.normalize();
+          mouseOrbitYaw = THREE.MathUtils.lerp(
+            mouseOrbitYaw,
+            mouseOrbitYawTarget,
+            Math.min(1, dt * CAMERA_MOUSE_FOLLOW_SPEED),
+          );
+          mouseOrbitPitch = THREE.MathUtils.lerp(
+            mouseOrbitPitch,
+            mouseOrbitPitchTarget,
+            Math.min(1, dt * CAMERA_MOUSE_FOLLOW_SPEED),
+          );
+
+          orbitForward.copy(carForward).applyAxisAngle(worldUp3, mouseOrbitYaw);
+          if (orbitForward.lengthSq() < 1e-6) {
+            orbitForward.set(0, 0, -1);
+          } else {
+            orbitForward.normalize();
+          }
+
+          orbitRight.crossVectors(worldUp3, orbitForward);
+          if (orbitRight.lengthSq() > 1e-6) {
+            orbitRight.normalize();
+          } else {
+            orbitRight.set(1, 0, 0);
+          }
+
+          orbitOffset.copy(orbitForward).multiplyScalar(-CAMERA_DISTANCE);
+          orbitOffset.y += CAMERA_HEIGHT;
+          orbitOffset.applyAxisAngle(orbitRight, mouseOrbitPitch);
+          desiredCamPos.copy(car.group.position).add(orbitOffset);
+
+          if (activeQuake) {
+            const t = activeQuake.elapsed;
+            const fade = Math.max(0, 1 - t / activeQuake.duration);
+            const s1 = Math.sin(activeQuake.frequencyHz * Math.PI * 2 * t);
+            const s2 = Math.sin(activeQuake.frequencyHz * Math.PI * 1.46 * t + 0.75);
+            desiredCamPos.x += s1 * activeQuake.amplitude * fade * 1.1;
+            desiredCamPos.z += s2 * activeQuake.amplitude * fade * 0.95;
+            camera.rotation.z = s2 * activeQuake.amplitude * fade * 0.08;
+          } else {
+            camera.rotation.z = 0;
+          }
+
+          camera.position.lerp(desiredCamPos, CAMERA_LERP);
+          lookTarget.copy(car.group.position).addScaledVector(orbitForward, CAMERA_LOOK_AHEAD);
+          lookTarget.y += 0.8;
+          camera.lookAt(lookTarget);
+          meteorCore.visible = false;
+          impactFlash.visible = false;
+          explosionGroup.visible = false;
         }
-
-        orbitRight.crossVectors(worldUp3, orbitForward);
-        if (orbitRight.lengthSq() > 1e-6) {
-          orbitRight.normalize();
-        } else {
-          orbitRight.set(1, 0, 0);
-        }
-
-        orbitOffset.copy(orbitForward).multiplyScalar(-CAMERA_DISTANCE);
-        orbitOffset.y += CAMERA_HEIGHT;
-        orbitOffset.applyAxisAngle(orbitRight, mouseOrbitPitch);
-        desiredCamPos.copy(car.group.position).add(orbitOffset);
-
-        if (activeQuake) {
-          const t = activeQuake.elapsed;
-          const fade = Math.max(0, 1 - t / activeQuake.duration);
-          const s1 = Math.sin(activeQuake.frequencyHz * Math.PI * 2 * t);
-          const s2 = Math.sin(activeQuake.frequencyHz * Math.PI * 1.46 * t + 0.75);
-          desiredCamPos.x += s1 * activeQuake.amplitude * fade * 1.1;
-          desiredCamPos.z += s2 * activeQuake.amplitude * fade * 0.95;
-          camera.rotation.z = s2 * activeQuake.amplitude * fade * 0.08;
-        } else {
-          camera.rotation.z = 0;
-        }
-
-        camera.position.lerp(desiredCamPos, CAMERA_LERP);
-        lookTarget.copy(car.group.position).addScaledVector(orbitForward, CAMERA_LOOK_AHEAD);
-        lookTarget.y += 0.8;
-        camera.lookAt(lookTarget);
 
         renderer.render(scene, camera);
       };
@@ -532,9 +856,21 @@ export default function BlockOnLand() {
         window.removeEventListener("pointerup", onPointerUp);
         window.removeEventListener("pointercancel", onPointerUp);
         renderer.domElement.removeEventListener("contextmenu", onCanvasContextMenu);
+        window.removeEventListener("keydown", onEndingShortcutKeyDown);
+        window.removeEventListener("keyup", onEndingShortcutKeyUp);
 
         worldChunks.dispose();
         car.dispose();
+        scene.remove(meteorCore);
+        meteorDisposables.forEach((item) => item.dispose());
+        scene.remove(impactFlash);
+        scene.remove(explosionGroup);
+        explosionShell.geometry.dispose();
+        (explosionShell.material as THREE.Material).dispose();
+        explosionCore.geometry.dispose();
+        (explosionCore.material as THREE.Material).dispose();
+        explosionRing.geometry.dispose();
+        (explosionRing.material as THREE.Material).dispose();
 
         scene.remove(farFloor);
         farFloor.geometry.dispose();
@@ -570,6 +906,7 @@ export default function BlockOnLand() {
     setTimelineUi(null);
     setProgressUi(null);
     setGameCompleted(false);
+    setEndingPhase("idle");
     setRestartToken((value) => value + 1);
   };
 
@@ -580,6 +917,7 @@ export default function BlockOnLand() {
     setTimelineUi(null);
     setProgressUi(null);
     setGameCompleted(false);
+    setEndingPhase("idle");
     setGameStarted(true);
     setRestartToken((value) => value + 1);
   };
@@ -646,20 +984,37 @@ export default function BlockOnLand() {
       )}
 
       {gameStarted && gameCompleted && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/42 px-6 backdrop-blur-sm">
-          <div className="max-w-lg rounded-2xl border border-white/30 bg-[linear-gradient(180deg,rgba(20,36,28,0.88),rgba(25,25,35,0.88))] p-8 text-center text-white shadow-[0_24px_80px_rgba(0,0,0,0.32)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/65">Timeline Complete</p>
-            <h2 className="mt-3 text-3xl font-black tracking-tight">Congratulations.</h2>
-            <p className="mt-4 text-base leading-7 text-white/88">
-              You survived all the earthquakes and made it through the full Southern California seismic timeline.
-            </p>
-            <button
-              type="button"
-              onClick={handleRestart}
-              className="mt-7 pointer-events-auto rounded-xl border border-red-200/55 bg-[color:var(--danger)] px-6 py-3 text-sm font-bold tracking-[0.14em] text-white shadow-[0_12px_28px_rgba(120,20,10,0.35)] transition-colors hover:bg-[#d85a45]"
+        <div
+          className={`absolute inset-0 z-40 px-6 transition-all duration-[1400ms] ${
+            endingPhase === "message"
+              ? "bg-black/100"
+              : endingPhase === "impact"
+                ? "bg-black/70 backdrop-blur-sm"
+                : "bg-black/10"
+          }`}
+        >
+          <div className="flex h-full items-center justify-center">
+            <div
+              className={`max-w-2xl text-center text-white transition-all duration-700 ${
+                endingPhase === "message"
+                  ? "translate-y-0 opacity-100"
+                  : "translate-y-6 opacity-0"
+              }`}
             >
-              Restart Run
-            </button>
+              <p className="font-[family-name:var(--font-display)] text-[0.72rem] font-semibold uppercase tracking-[0.42em] text-white/55">
+                Final Impact
+              </p>
+              <h2 className="mt-5 font-[family-name:var(--font-display)] text-3xl font-semibold tracking-[-0.04em] sm:text-5xl">
+                Thanks for playing our game
+              </h2>
+              <button
+                type="button"
+                onClick={handleRestart}
+                className="mt-8 pointer-events-auto rounded-xl border border-white/20 bg-white/10 px-6 py-3 text-sm font-bold tracking-[0.14em] text-white transition-colors hover:bg-white/16"
+              >
+                Restart Run
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -676,7 +1031,11 @@ export default function BlockOnLand() {
         </div>
       )}
 
-      <div className="pointer-events-none absolute left-4 right-4 top-3 z-20 rounded-md border border-white/20 bg-black/55 px-3 py-2 text-[11px] text-white backdrop-blur-sm">
+      <div
+        className={`pointer-events-none absolute left-4 right-4 top-3 z-20 rounded-md border border-white/20 bg-black/55 px-3 py-2 text-[11px] text-white backdrop-blur-sm transition-opacity duration-500 ${
+          gameCompleted ? "opacity-0" : "opacity-100"
+        }`}
+      >
         <div className="flex flex-wrap items-center justify-between gap-2 font-semibold tracking-wide">
           <span>
             {timelineUi
@@ -698,7 +1057,11 @@ export default function BlockOnLand() {
         </div>
       </div>
 
-      <div className="pointer-events-none absolute left-4 top-20 z-10 rounded-md border border-white/20 bg-black/45 p-3 text-xs text-white backdrop-blur-sm">
+      <div
+        className={`pointer-events-none absolute left-4 top-20 z-10 rounded-md border border-white/20 bg-black/45 p-3 text-xs text-white backdrop-blur-sm transition-opacity duration-500 ${
+          gameCompleted ? "opacity-0" : "opacity-100"
+        }`}
+      >
         <p className="font-semibold tracking-wide">
           Month/Year: {timelineUi ? `${String(timelineUi.month).padStart(2, "0")}/${timelineUi.year}` : "--/----"}
         </p>

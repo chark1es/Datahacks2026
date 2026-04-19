@@ -26,6 +26,7 @@ export type CarActor = {
   body: RigidBody;
   colliders: Collider[];
   colliderHandles: Set<number>;
+  setControlsEnabled: (enabled: boolean) => void;
   updateControls: (
     simTime: number,
     activeQuake: ActiveQuake | null,
@@ -167,7 +168,20 @@ export function createCarActor(ctx: PhysicsContext, scene: THREE.Scene): CarActo
   const colliderHandles = new Set(colliders.map((collider) => collider.handle));
 
   const keys = { w: false, s: false, a: false, d: false };
+  let controlsEnabled = true;
+  const clearInputs = () => {
+    keys.w = false;
+    keys.s = false;
+    keys.a = false;
+    keys.d = false;
+  };
   const onKey = (event: KeyboardEvent, down: boolean) => {
+    if (!controlsEnabled) {
+      if (down) {
+        event.preventDefault();
+      }
+      return;
+    }
     const key = event.code;
     let handled = false;
     if (key === "KeyW" || key === "ArrowUp") {
@@ -210,6 +224,15 @@ export function createCarActor(ctx: PhysicsContext, scene: THREE.Scene): CarActo
 
   let yaw = 0;
   let forwardSpeed = 0;
+
+  const setControlsEnabled = (enabled: boolean) => {
+    controlsEnabled = enabled;
+    if (!enabled) {
+      clearInputs();
+      forwardSpeed = 0;
+      visualForwardSpeed = 0;
+    }
+  };
 
   const resolvePlanarMove = (
     currentPosition: THREE.Vector3,
@@ -405,6 +428,7 @@ export function createCarActor(ctx: PhysicsContext, scene: THREE.Scene): CarActo
     body,
     colliders,
     colliderHandles,
+    setControlsEnabled,
     updateControls,
     updateVisuals,
     dispose,
