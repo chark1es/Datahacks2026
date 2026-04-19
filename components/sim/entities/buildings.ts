@@ -343,7 +343,8 @@ export function createBuildingSystem(ctx: PhysicsContext): BuildingSystem {
     scheduleCollapsesNearCar(simTime, Math.max(1, Math.ceil(count * 0.75)), carBody);
   };
 
-  const processPendingDamage = (simTime: number, _carBody: import("@dimforge/rapier3d-compat").RigidBody) => {
+  const processPendingDamage = (simTime: number, carBody: import("@dimforge/rapier3d-compat").RigidBody) => {
+    void carBody;
     for (let i = pendingCrumbles.length - 1; i >= 0; i--) {
       const item = pendingCrumbles[i];
       if (item.at > simTime) continue;

@@ -57,6 +57,8 @@ export default function BlockOnLand() {
   const [gameStarted, setGameStarted] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
   const [restartToken, setRestartToken] = useState(0);
+  const gameCompletedRef = useRef(false);
+  gameCompletedRef.current = gameCompleted;
   const timelineMonthKeyRef = useRef<string>("");
   const autoTriggeredMonthKeyRef = useRef<string>("");
 
@@ -140,7 +142,6 @@ export default function BlockOnLand() {
       });
       const car = createCarActor(physics, scene);
       const damageSystem = createDamageSystem({
-        scheduleTopBreaksNearCar: buildingSystem.scheduleTopBreaksNearCar,
         scheduleCollapsesNearCar: buildingSystem.scheduleCollapsesNearCar,
       });
       const collisionSystem = createCollisionSystem({
@@ -330,7 +331,7 @@ export default function BlockOnLand() {
           monthTimeline.length,
         );
 
-        if (!gameCompleted && monthTimeline.length > 0 && timelineProgress.progress01 >= 1) {
+        if (!gameCompletedRef.current && monthTimeline.length > 0 && timelineProgress.progress01 >= 1) {
           setGameCompleted(true);
         }
 

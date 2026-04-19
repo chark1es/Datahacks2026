@@ -4,7 +4,6 @@ import type { FaultEvent, WorldDamageState } from "@/components/sim/types";
 import { hashString, seededRand } from "@/components/sim/utils";
 
 type DamageSystemDeps = {
-  scheduleTopBreaksNearCar: (simTime: number, count: number, carBody: RigidBody, strength: number) => void;
   scheduleCollapsesNearCar: (simTime: number, count: number, carBody: RigidBody) => void;
 };
 
@@ -14,10 +13,7 @@ export type DamageSystem = {
   applyMagnitudeDamage: (magnitudeMw: number, simTime: number, carBody: RigidBody) => void;
 };
 
-export function createDamageSystem({
-  scheduleTopBreaksNearCar,
-  scheduleCollapsesNearCar,
-}: DamageSystemDeps): DamageSystem {
+export function createDamageSystem({ scheduleCollapsesNearCar }: DamageSystemDeps): DamageSystem {
   const faultEvents: FaultEvent[] = [];
   const worldDamage: WorldDamageState = {
     maxTier: 0,
