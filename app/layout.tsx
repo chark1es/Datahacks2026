@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Manrope, Literata } from "next/font/google";
+import { Literata, Oxanium } from "next/font/google";
 import "./globals.css";
 
-const display = Manrope({
+const display = Oxanium({
   subsets: ["latin"],
   variable: "--font-display-fallback",
   display: "swap",

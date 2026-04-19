@@ -45,6 +45,90 @@ export function createWorldChunksSystem({
     roughness: 0.38,
     metalness: 0.04,
   });
+  const treeTrunkMaterial = new THREE.MeshStandardMaterial({
+    color: 0x624632,
+    roughness: 0.94,
+    metalness: 0.02,
+  });
+  const treeLeafMaterialWarm = new THREE.MeshStandardMaterial({
+    color: 0x6b8f49,
+    roughness: 0.98,
+    metalness: 0,
+  });
+  const treeLeafMaterialCool = new THREE.MeshStandardMaterial({
+    color: 0x4f7440,
+    roughness: 0.98,
+    metalness: 0,
+  });
+
+  const addRoadsideTree = (
+    group: THREE.Group,
+    x: number,
+    z: number,
+    seed: number,
+    side: number,
+  ) => {
+    const tree = new THREE.Group();
+    tree.position.set(x, 0, z);
+
+    const trunkHeight = 1.65 + seededRand(seed + 1) * 0.75;
+    const trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.09, 0.18, trunkHeight, 7),
+      treeTrunkMaterial,
+    );
+    trunk.position.y = trunkHeight / 2;
+    trunk.castShadow = true;
+    tree.add(trunk);
+
+    const branchYaw = (seededRand(seed + 2) - 0.5) * 0.5;
+    for (let branchIndex = 0; branchIndex < 2; branchIndex++) {
+      const branch = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.035, 0.055, 0.82, 6),
+        treeTrunkMaterial,
+      );
+      branch.position.set(
+        side * (0.08 + branchIndex * 0.06),
+        trunkHeight * (0.6 + branchIndex * 0.08),
+        (branchIndex === 0 ? -1 : 1) * 0.08,
+      );
+      branch.rotation.z = side * (0.72 + branchIndex * 0.16);
+      branch.rotation.y = branchYaw + (branchIndex === 0 ? -0.35 : 0.28);
+      branch.castShadow = true;
+      tree.add(branch);
+    }
+
+    const crownBaseY = trunkHeight * 0.82;
+    const crownMaterial = side > 0 ? treeLeafMaterialCool : treeLeafMaterialWarm;
+    const crownOffsets = [
+      { x: 0, y: 0.64, z: 0, scale: [1.2, 1.05, 1.1] },
+      { x: -0.42, y: 0.32, z: -0.14, scale: [0.92, 0.86, 0.88] },
+      { x: 0.46, y: 0.28, z: 0.18, scale: [0.88, 0.82, 0.9] },
+      { x: 0.1, y: 0.98, z: -0.08, scale: [0.82, 0.9, 0.8] },
+    ] as const;
+
+    for (let i = 0; i < crownOffsets.length; i++) {
+      const blob = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.62 + i * 0.06 + seededRand(seed + 10 + i) * 0.08, 0),
+        crownMaterial,
+      );
+      const offset = crownOffsets[i];
+      blob.position.set(
+        offset.x + (seededRand(seed + 20 + i) - 0.5) * 0.12,
+        crownBaseY + offset.y,
+        offset.z + (seededRand(seed + 30 + i) - 0.5) * 0.12,
+      );
+      blob.scale.set(
+        offset.scale[0] + seededRand(seed + 40 + i) * 0.15,
+        offset.scale[1] + seededRand(seed + 50 + i) * 0.12,
+        offset.scale[2] + seededRand(seed + 60 + i) * 0.15,
+      );
+      blob.castShadow = true;
+      tree.add(blob);
+    }
+
+    tree.rotation.y = seededRand(seed + 70) * Math.PI * 2;
+    group.add(tree);
+  };
 
   const addRoadsideGreenery = (group: THREE.Group, chunkIndex: number) => {
     for (let side = -1; side <= 1; side += 2) {
@@ -52,31 +136,7 @@ export function createWorldChunksSystem({
         const seed = chunkIndex * 251 + (side > 0 ? 97 : 11) + i * 19;
         const z = chunkIndex * CHUNK_LENGTH + (i + 0.45 + seededRand(seed + 1) * 0.22) * (CHUNK_LENGTH / 5);
         const x = side * (8.4 + seededRand(seed + 2) * 2.4);
-
-        const trunk = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.16, 0.2, 1.05 + seededRand(seed + 3) * 0.45, 8),
-          new THREE.MeshStandardMaterial({ color: 0x5f4632, roughness: 0.96, metalness: 0.03 }),
-        );
-        trunk.position.set(x, trunk.geometry.parameters.height / 2, z);
-        trunk.castShadow = true;
-        group.add(trunk);
-
-        const canopy = new THREE.Mesh(
-          new THREE.SphereGeometry(0.78 + seededRand(seed + 4) * 0.4, 10, 10),
-          new THREE.MeshStandardMaterial({
-            color: side > 0 ? 0x5b7f45 : 0x6b8e4f,
-            roughness: 0.98,
-            metalness: 0.01,
-          }),
-        );
-        canopy.position.set(
-          x + (seededRand(seed + 5) - 0.5) * 0.28,
-          trunk.position.y + trunk.geometry.parameters.height * 0.5 + 0.78,
-          z + (seededRand(seed + 6) - 0.5) * 0.45,
-        );
-        canopy.scale.set(1, 0.88 + seededRand(seed + 7) * 0.24, 1);
-        canopy.castShadow = true;
-        group.add(canopy);
+        addRoadsideTree(group, x, z, seed, side);
       }
 
       for (let i = 0; i < 7; i++) {
@@ -305,6 +365,9 @@ export function createWorldChunksSystem({
     lampPoleMaterial.dispose();
     lampHeadMaterial.dispose();
     lampGlowMaterial.dispose();
+    treeTrunkMaterial.dispose();
+    treeLeafMaterialWarm.dispose();
+    treeLeafMaterialCool.dispose();
   };
 
   return {

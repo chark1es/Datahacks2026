@@ -161,6 +161,17 @@ export async function loadMonthlyMagnitudeTimeline(
     });
   }
 
+  if (out.length > 0) {
+    const firstMonth = addMonths(new Date(Date.UTC(out[0].year, out[0].month - 1, 1)), -1);
+    out.unshift({
+      monthKey: monthKey(firstMonth),
+      year: firstMonth.getUTCFullYear(),
+      month: firstMonth.getUTCMonth() + 1,
+      targetMagnitude: 0,
+      eventCount: 0,
+    });
+  }
+
   return out;
 }
 

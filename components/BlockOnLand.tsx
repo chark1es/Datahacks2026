@@ -63,8 +63,6 @@ export default function BlockOnLand() {
   const autoTriggeredMonthKeyRef = useRef<string>("");
 
   useEffect(() => {
-    if (!gameStarted) return;
-
     const mount = mountRef.current;
     if (!mount) return;
 
@@ -288,6 +286,10 @@ export default function BlockOnLand() {
       };
 
       const triggerScaledMonthQuake = (scenarioIndex: number, targetMw: number) => {
+        if (targetMw <= 0) {
+          setQuakeUi({ magnitudeMw: 0, targetMw: 0 });
+          return;
+        }
         if (!pgvData || !pgvManifest || pgvCount <= 0) return;
         const sIdx = ((scenarioIndex % pgvCount) + pgvCount) % pgvCount;
         const scenarioMax = maxPgvForScenario(pgvData, pgvManifest, sIdx);
@@ -304,7 +306,9 @@ export default function BlockOnLand() {
       const tick = () => {
         const dt = Math.min(clock.getDelta(), 1 / 20);
         hudElapsed += dt;
-        physicsAccumulator += dt;
+        if (gameStarted && !gameCompletedRef.current) {
+          physicsAccumulator += dt;
+        }
 
         if (collisionCooldown > 0) {
           collisionCooldown = Math.max(0, collisionCooldown - dt);
@@ -374,6 +378,7 @@ export default function BlockOnLand() {
         }
 
         if (
+          gameStarted &&
           activeMonth &&
           activeMonth.monthKey !== autoTriggeredMonthKeyRef.current &&
           pgvCount > 0 &&
@@ -384,7 +389,7 @@ export default function BlockOnLand() {
           triggerScaledMonthQuake(timelineIndex, activeMonth.targetMagnitude);
         }
 
-        while (physicsAccumulator >= PHYSICS_FIXED_STEP) {
+        while (gameStarted && !gameCompletedRef.current && physicsAccumulator >= PHYSICS_FIXED_STEP) {
           simTime += PHYSICS_FIXED_STEP;
 
           buildingSystem.processPendingDamage(simTime, car.body);
@@ -582,35 +587,60 @@ export default function BlockOnLand() {
   return (
     <div ref={mountRef} className="relative h-dvh w-full">
       {!gameStarted && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-[linear-gradient(180deg,rgba(130,197,240,0.92),rgba(241,210,153,0.88)_44%,rgba(124,174,101,0.92))] px-6">
-          <div className="max-w-xl rounded-2xl border border-white/45 bg-black/28 p-7 text-white shadow-[0_24px_80px_rgba(0,0,0,0.24)] backdrop-blur-md">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/78">Fault Run</p>
-            <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Drive the quake timeline.</h1>
-            <p className="mt-4 text-sm leading-6 text-white/88">
-              Welcome. You are about to drive through 26 years of seismic history in Southern California, where your
-              movement forward advances time and the world around you responds to real earthquake events recorded by
-              the USGS and enhanced with scientific ground motion simulations. As you travel, you will experience how
-              the environment changes based on actual seismic activity, shifts in intensity, frequency, and impact,
-              creating a data-driven reconstruction of how the Earth truly moved over time. This is not a fictional
-              scenario, but a visualization of real events, allowing you to observe and experience earthquakes as they
-              unfolded. Drive forward to begin the timeline.
-            </p>
-            <p className="mt-4 text-sm leading-6 text-white/88">
-              Buildings and lamp posts can collapse into the street as the earthquake magnitude rises. Stay moving,
-              avoid barriers, and drive through the month-by-month timeline.
-            </p>
-            <div className="mt-5 space-y-2 text-sm text-white/86">
-              <p>`WASD` or arrow keys to steer and drive.</p>
-              <p>Collisions can trigger the next quake event.</p>
-              <p>Use mouse drag to orbit the camera while driving.</p>
+        <div className="absolute inset-0 z-40 bg-white/50 backdrop-blur-[4px]">
+          <div className="relative flex h-full items-center justify-center px-6 py-10">
+            <div className="w-full max-w-3xl rounded-2xl border border-black/10 bg-[color:oklch(0.985_0.006_98)] p-7 text-[color:oklch(0.24_0.02_240)] shadow-[0_20px_48px_rgba(15,23,42,0.1)] sm:p-8">
+              <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
+                <div>
+                  <p className="font-[family-name:var(--font-display)] text-sm font-medium tracking-tight text-[color:oklch(0.42_0.025_240)]">
+                    The Quake Driver
+                  </p>
+                  <h1 className="mt-2 max-w-xl font-[family-name:var(--font-display)] text-[1.65rem] font-semibold leading-[1.15] tracking-[-0.02em] text-[color:oklch(0.2_0.02_240)] sm:text-3xl">
+                    Drive the seismic record.
+                  </h1>
+                  <p className="mt-4 max-w-xl font-[family-name:var(--font-body)] text-sm leading-relaxed text-[color:oklch(0.44_0.02_240)]">
+                    The road is a month-by-month earthquake timeline for Southern California. Drive forward to advance
+                    through the dataset, feel each triggered quake, and keep the lane clear long enough to survive the
+                    full run.
+                  </p>
+                  <p className="mt-5 max-w-xl text-xs leading-6 text-[color:oklch(0.48_0.02_240)]">
+                    Dataset-driven motion · obstacle avoidance · month-by-month progression
+                  </p>
+                </div>
+                <div className="rounded-xl border border-black/8 bg-[color:oklch(0.995_0.004_98)] p-5">
+                  <p className="font-[family-name:var(--font-display)] text-xs font-medium uppercase tracking-[0.14em] text-[color:oklch(0.46_0.02_240)]">
+                    Instructions
+                  </p>
+                  <div className="mt-4 space-y-3 text-sm text-[color:oklch(0.44_0.02_240)]">
+                    <div className="flex items-start justify-between gap-4 border-b border-black/8 pb-3">
+                      <span className="text-[color:oklch(0.24_0.02_240)]">Drive</span>
+                      <span className="font-[family-name:var(--font-display)] text-[13px] text-[color:oklch(0.4_0.08_200)]">
+                        WASD / arrows
+                      </span>
+                    </div>
+                    <div className="flex items-start justify-between gap-4 border-b border-black/8 pb-3">
+                      <span className="text-[color:oklch(0.24_0.02_240)]">Look</span>
+                      <span className="font-[family-name:var(--font-display)] text-[13px] text-[color:oklch(0.4_0.08_200)]">
+                        Drag to orbit
+                      </span>
+                    </div>
+                    <div className="flex items-start justify-between gap-4">
+                      <span className="text-[color:oklch(0.24_0.02_240)]">Goal</span>
+                      <span className="max-w-[12rem] text-right text-[color:oklch(0.48_0.02_240)]">
+                        Keep moving; avoid debris as each month activates.
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleStart}
+                    className="mt-6 w-full pointer-events-auto rounded-lg border border-[color:var(--accent)]/40 bg-[color:var(--accent)] px-5 py-2.5 font-[family-name:var(--font-display)] text-sm font-medium tracking-wide text-[color:var(--surface-deep)] transition-colors hover:brightness-[0.96]"
+                  >
+                    Start run
+                  </button>
+                </div>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={handleStart}
-              className="mt-7 pointer-events-auto rounded-xl border border-white/35 bg-[var(--accent)] px-6 py-3 text-base font-bold tracking-wide text-black transition-transform hover:scale-[1.02]"
-            >
-              Start Game
-            </button>
           </div>
         </div>
       )}
