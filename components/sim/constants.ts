@@ -1,0 +1,49 @@
+export const CAMERA_HEIGHT = 3.2;
+export const CAMERA_DISTANCE = 7.6;
+export const CAMERA_LERP = 0.16;
+export const CAMERA_LOOK_AHEAD = 2.4;
+export const CAMERA_MOUSE_YAW_SENSITIVITY = 0.006;
+export const CAMERA_MOUSE_PITCH_SENSITIVITY = 0.0045;
+export const CAMERA_MOUSE_MAX_YAW = 1.5;
+export const CAMERA_MOUSE_MAX_PITCH = 0.58;
+export const CAMERA_MOUSE_RETURN_SPEED = 4.2;
+export const CAMERA_MOUSE_FOLLOW_SPEED = 12;
+
+export const QUAKE_DURATION = 4.2;
+export const COLLISION_COOLDOWN = 0.5;
+export const CHUNK_LENGTH = 24;
+export const VISIBLE_CHUNKS = 6;
+export const TIMELINE_UNITS_PER_MONTH = 12;
+export const WORLD_HALF_X = 28;
+export const HUD_UPDATE_INTERVAL = 0.1;
+
+export const PHYSICS_FIXED_STEP = 1 / 60;
+export const TERRAIN_TILE_THICKNESS = 0.7;
+export const TERRAIN_TILES_X = 12;
+export const TERRAIN_TILES_Z = 6;
+export const TERRAIN_WIDTH = WORLD_HALF_X * 2 + 16;
+
+export const CAR_ENGINE_FORCE = 5600;
+export const CAR_REVERSE_FORCE = 3200;
+export const CAR_BRAKE_FORCE = 3800;
+export const CAR_STEER_TORQUE = 1200;
+export const CAR_SIDE_GRIP = 0.18;
+export const CAR_AIR_SIDE_GRIP = 0.05;
+export const CAR_DOWNFORCE = 72;
+export const CAR_UPRIGHT_STIFFNESS = 980;
+export const CAR_UPRIGHT_DAMPING = 120;
+export const CAR_MAX_ROLL_RATE = 3.1;
+export const CAR_WHEELBASE = 2.4;
+export const CAR_MAX_STEER_ANGLE = 0.58;
+export const CAR_BASE_DRAG = 0.992;
+export const CAR_COAST_DRAG = 0.982;
+export const CAR_GROUNDED_HEIGHT = 0.95;
+export const CAR_GROUNDED_VERTICAL_SPEED = 3.2;
+export const CAR_WHEEL_RAYCAST_UP = 0.42;
+export const CAR_WHEEL_RAYCAST_DOWN = 0.86;
+export const WHEEL_RADIUS = 0.34;
+export const MAX_WHEEL_STEER_ANGLE = 0.55;
+export const WHEEL_STEER_LERP = 9.5;
+
+export const TERRAIN_MEMBERSHIP = 0b0100;
+export const DEFAULT_MEMBERSHIP = 0b0001;

@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+:root {
+  /* OKLCH — dark lab / instrument panel (tinted neutrals toward teal-blue) */
+  --surface-deep: oklch(0.14 0.02 240);
+  --surface: oklch(0.19 0.025 238);
+  --surface-raised: oklch(0.24 0.028 236);
+  --border-subtle: oklch(0.35 0.04 235);
+  --text-primary: oklch(0.92 0.02 240);
+  --text-muted: oklch(0.72 0.03 238);
+  --accent: oklch(0.78 0.14 195);
+  --accent-dim: oklch(0.55 0.1 200);
+  --danger: oklch(0.72 0.16 25);
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --font-display: var(--font-display-fallback), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-body-fallback), ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface-deep);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
